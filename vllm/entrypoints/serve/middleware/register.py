@@ -73,3 +73,35 @@ def init_entrypoints_middleware(
             raise ValueError(
                 f"Invalid middleware {middleware}. Must be a function or a class."
             )
+
+    # Edge guard is added last so it is the outermost layer: unauthenticated or
+    # over-limit requests are rejected before any other middleware runs.
+    # An invalid config raises here and aborts start-up (fail closed).
+    if envs.VLLM_EDGE_CONFIG:
+        from vllm.edge import EdgeGuardMiddleware, load_edge_config
+
+        edge_config = load_edge_config(envs.VLLM_EDGE_CONFIG)
+        if tokens:
+            logger.warning(
+                "Both --api-key/VLLM_API_KEY and VLLM_EDGE_CONFIG are set. "
+                "Requests must satisfy both; prefer edge tenants only."
+            )
+        policy = getattr(args, "scheduling_policy", None)
+        if (
+            edge_config.inject_priority
+            and policy is not None
+            and policy != "priority"
+            and any(t.priority != 0 for t in edge_config.tiers.values())
+        ):
+            # vLLM rejects non-zero priorities unless priority scheduling is on.
+            raise ValueError(
+                "Edge config assigns non-zero tier priorities but the server "
+                f"uses --scheduling-policy {policy}; start with "
+                "--scheduling-policy priority or set inject_priority=false."
+            )
+        app.add_middleware(EdgeGuardMiddleware, config=edge_config)
+        logger.info(
+            "Edge guard enabled: %d tenants, %d tiers",
+            len(edge_config.tenants),
+            len(edge_config.tiers),
+        )
