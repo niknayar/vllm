@@ -1,0 +1,116 @@
+{
+  "overhead": {
+    "bare_asgi": 1.8156104000809137,
+    "edge_guard": 25.627158299903385,
+    "added_us_per_request": 23.81154789982247,
+    "body_bytes": 661,
+    "requests": 20000
+  },
+  "scenarios": [
+    {
+      "scenario": "A stock: FCFS, no guard",
+      "critical": {
+        "ok": 52,
+        "rejected": 0,
+        "req_per_s": 6.5,
+        "p50_ms": 442.3,
+        "p95_ms": 452.3,
+        "p99_ms": 453.3,
+        "mean_ms": 413.8
+      },
+      "batch": {
+        "ok": 572,
+        "rejected": 0,
+        "req_per_s": 71.5,
+        "p50_ms": 481.5,
+        "p95_ms": 488.7,
+        "p99_ms": 490.4,
+        "mean_ms": 458.3
+      }
+    },
+    {
+      "scenario": "B priority sched, no guard, batch cheats",
+      "critical": {
+        "ok": 8,
+        "rejected": 0,
+        "req_per_s": 1.0,
+        "p50_ms": 4116.2,
+        "p95_ms": 8180.8,
+        "p99_ms": 8181.0,
+        "mean_ms": 4116.0
+      },
+      "batch": {
+        "ok": 616,
+        "rejected": 0,
+        "req_per_s": 77.0,
+        "p50_ms": 434.0,
+        "p95_ms": 438.6,
+        "p99_ms": 440.9,
+        "mean_ms": 425.6
+      }
+    },
+    {
+      "scenario": "C priority sched + edge guard",
+      "critical": {
+        "ok": 120,
+        "rejected": 0,
+        "req_per_s": 15.0,
+        "p50_ms": 55.1,
+        "p95_ms": 103.1,
+        "p99_ms": 103.6,
+        "mean_ms": 66.5
+      },
+      "batch": {
+        "ok": 431,
+        "rejected": 1171,
+        "req_per_s": 53.9,
+        "p50_ms": 51.3,
+        "p95_ms": 53.6,
+        "p99_ms": 54.8,
+        "mean_ms": 51.6
+      }
+    },
+    {
+      "scenario": "D priority sched + edge guard, batch cheats",
+      "critical": {
+        "ok": 120,
+        "rejected": 0,
+        "req_per_s": 15.0,
+        "p50_ms": 55.8,
+        "p95_ms": 100.4,
+        "p99_ms": 102.2,
+        "mean_ms": 66.6
+      },
+      "batch": {
+        "ok": 430,
+        "rejected": 1172,
+        "req_per_s": 53.8,
+        "p50_ms": 51.5,
+        "p95_ms": 53.7,
+        "p99_ms": 54.6,
+        "mean_ms": 51.7
+      }
+    },
+    {
+      "scenario": "E guard, critical saturates node (no think)",
+      "critical": {
+        "ok": 616,
+        "rejected": 0,
+        "req_per_s": 77.0,
+        "p50_ms": 51.9,
+        "p95_ms": 53.1,
+        "p99_ms": 63.4,
+        "mean_ms": 52.1
+      },
+      "batch": {
+        "ok": 0,
+        "rejected": 1280,
+        "req_per_s": 0.0,
+        "p50_ms": 0.0,
+        "p95_ms": 0.0,
+        "p99_ms": 0.0,
+        "mean_ms": 0.0
+      }
+    }
+  ]
+}

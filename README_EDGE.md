@@ -34,9 +34,10 @@ The toolkit does **not** make the model's forward pass faster. It improves
 | Edge engine profiles | Starting values for `--max-num-seqs`, `--max-num-batched-tokens`, `--max-model-len`, `--gpu-memory-utilization`, prefix caching, chunked prefill and optional fp8 KV cache sized for small devices. |
 | `vllm.edge.bench` | Closed-loop, per-tier load generator so you can measure TTFT/latency/throughput and shed/limit counts with and without the guard. |
 
-**No benchmark numbers are claimed.** The profiles are starting points, not
-measured optima. Expected benefit scales with how mixed your traffic is: with
-one caller and no contention there is nothing to prioritise.
+**No real-hardware vLLM numbers are claimed.** The profiles are starting
+points, not measured optima. Expected benefit scales with how mixed your
+traffic is: with one caller and no contention there is nothing to prioritise.
+See [Simulation results](#simulation-results) for what has been measured.
 
 ## Security model
 
@@ -167,6 +168,45 @@ paths, 413 by header and by stream, rate-limit refill, shedding order,
 concurrency release, security headers, audit-log secrecy, config rejection
 cases, world-writable config, key tool round-trip, and that every flag in the
 profiles exists in vLLM's argument sources.
+
+## Simulation results
+
+Harness: `benchmarks/edge/sim_benchmark.py`; raw output:
+`benchmarks/edge/results/sim_results_apple_m5.json`. Run on an Apple M5,
+Python 3.12, 8 s per scenario.
+
+**Part 1: guard overhead (real middleware code, 20,000 requests, 661 B body).**
+Bare ASGI app 1.8 us/request, with guard 25.6 us/request, so the guard adds
+about 24 us per request.
+
+**Part 2: contention model (simulated engine).** The real guard sits in front
+of a fake engine with 4 slots at 50 ms per request (about 80 req/s capacity),
+a first-come-first-served or priority waiting queue, 4 interactive critical
+workers (200 ms think time) and 32 batch workers.
+
+| Scenario | Tier | OK | Rejected | req/s | p50 ms | p95 ms |
+|---|---|---|---|---|---|---|
+| A: stock FCFS, no guard | critical | 52 | 0 | 6.5 | 442 | 452 |
+| | batch | 572 | 0 | 71.5 | 482 | 489 |
+| B: priority scheduling, no guard, batch sends `priority: -1000` | critical | 8 | 0 | 1.0 | 4116 | 8181 |
+| | batch | 616 | 0 | 77.0 | 434 | 439 |
+| C: priority scheduling + guard | critical | 120 | 0 | 15.0 | 55 | 103 |
+| | batch | 431 | 1171 | 53.9 | 51 | 54 |
+| D: guard, batch still sends `priority: -1000` | critical | 120 | 0 | 15.0 | 56 | 100 |
+| | batch | 430 | 1172 | 53.8 | 52 | 55 |
+| E: guard, critical saturates the node | critical | 616 | 0 | 77.0 | 52 | 53 |
+| | batch | 0 | 1280 | 0.0 | - | - |
+
+What it shows: critical p50 falls from about 442 ms (A) to about 55 ms (C);
+without the guard a client can cheat its priority and push critical p95 to
+about 8 s (B), and the guard prevents that (D). Costs: batch throughput drops
+from 71.5 to 53.9 req/s because shed requests leave slots idle, and a critical
+tenant that never pauses (E) starves batch completely, so cap critical tenants
+with `rate_per_sec` or `max_concurrency` if that is not wanted.
+
+**These are model results, not vLLM results.** The engine has a fixed service
+time, does not preempt running requests, and has no KV cache or token-level
+batching. Do not read the 8x figure as a prediction for vLLM.
 
 **Not yet verified:** an end-to-end run against a live model on GPU/Jetson
 hardware. The `bench` tool is provided for that; results should be added here
